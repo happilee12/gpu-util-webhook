@@ -1,18 +1,18 @@
 ## HOW TO USE
 
-### change these in gpu_usage.py
-TARGET_WEBHOOK_URL_REALTIME = 'https://your_webhook_url'
-TARGET_WEBHOOK_URL = 'https://your_webhook_url'
-GPU_REALTIME_USAGE_DIR = "./daily/"
-GPU_DAILY_USAGE_DIR = "./daily_avg/"
+### 01. change these in gpu_usage.py
+* TARGET_WEBHOOK_URL_REALTIME = 'https://your_webhook_url'
+* TARGET_WEBHOOK_URL = 'https://your_webhook_url'
+* GPU_REALTIME_USAGE_DIR = "./daily/"
+* GPU_DAILY_USAGE_DIR = "./daily_avg/"
 
-### change this to current path add_cron.sh
-GPU_USAGE_FILE_PATH="/home/vln/90_query_gpu_public/gpu_usage.py"
+### 02. change this to current path add_cron.sh
+* GPU_USAGE_FILE_PATH="/home/vln/90_query_gpu_public/gpu_usage.py"
 
-### install pandas
+### 03. install pandas
 ```pip install pandas```
 
-### run 
+### 04. run 
 ```bash add_cron.sh```
 - this command will add cronjob in your server
 - to check existing cronjobs, run ```crontab -e```
