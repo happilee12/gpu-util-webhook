@@ -248,6 +248,10 @@ def get_daily_usage():
     daily_avg = calculate_average_gpu_usage(directory_path)
     return daily_avg
 
+def test_gpu_info_parse():
+    nvidia_smi_result = run_nvidia_smi()
+    gpu_df = get_gpu_info(nvidia_smi_result)
+    print(gpu_df)
 
 def send_realtime_usage():
     nvidia_smi_result = run_nvidia_smi()
@@ -290,6 +294,8 @@ if __name__ == "__main__":
         send_daily_usage()
     elif sys.argv[1] == 'send_period_average': 
         send_period_average()
-
+    elif sys.argv[1] == 'test_gpu_info_parse': 
+        test_gpu_info_parse()
     else:
         print("지원하지 않는 함수입니다.")
+
