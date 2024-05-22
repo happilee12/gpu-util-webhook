@@ -37,4 +37,4 @@ expected output:
 
 ```
 
-if there's error look into `parse_gpu_info` function <br>espacially if the regex pattern matches your nvidia-smi output</br>
+if there's error look into `parse_gpu_info` function <strong>espacially if the regex pattern matches your nvidia-smi output</strong>
