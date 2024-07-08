@@ -161,7 +161,7 @@ def parse_gpu_info(output):
     gpu_info = {}
     lines = output.split('\n')
     gpu_count = 0
-    pattern = r"^\|\s+(\d+)\s+NVIDIA\s+(\w+)\s+(\d+)GB\s+(\w+)\s+Off\s+\|\s+(\S+)\s+Off\s+\|\s+(\d+)\s+\|"
+    pattern = r"^\|\s+(\d+)\s+NVIDIA\s+(\w+)\s+(\d+)GB\s+(\w+)\s+(Off|On)\s+\|\s+(\S+)\s+(Off|On)\s+\|\s+(\d+)\s+\|"
 
     output = []
     for ln, line in enumerate(lines):
