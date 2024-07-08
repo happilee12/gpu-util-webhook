@@ -8,9 +8,8 @@ import json
 import requests
 import sys
 import re
+from my_url import GPU_NAME, SLACK_WEBHOOK_URL, SLACK_WEBHOOK_URL_REALTIME 
 
-TARGET_WEBHOOK_URL_REALTIME = 'https://your_webhook_url'
-TARGET_WEBHOOK_URL = 'https://your_webhook_url'
 GPU_REALTIME_USAGE_DIR = "./daily/"
 GPU_DAILY_USAGE_DIR = "./daily_avg/"
 
@@ -32,6 +31,23 @@ def send_teams_message(content, webhook_url):
     else:
         print("Error sending message to Microsoft Teams:", response.status_code)
         print("Error sending message to Microsoft Teams:", response.text)
+
+def send_slack_message(message, webhook_url):
+    try:
+        headers = {'Content-type': 'application/json'}
+        response = requests.post(webhook_url, headers=headers, data=json.dumps(message))
+        response.raise_for_status()
+        print("Message sent successfully to Slack via webhook")
+        return True
+    except requests.exceptions.HTTPError as errh:
+        print(f"HTTP Error: {errh}")
+    except requests.exceptions.ConnectionError as errc:
+        print(f"Error Connecting: {errc}")
+    except requests.exceptions.Timeout as errt:
+        print(f"Timeout Error: {errt}")
+    except requests.exceptions.RequestException as err:
+        print(f"Something went wrong: {err}")
+    return False
 
 def create_teams_table_card(df, title):
     # 테이블 데이터 생성
@@ -100,6 +116,41 @@ def create_teams_table_card(df, title):
         adaptive_card_body
     }
     
+    return contents
+
+def create_slack_table_card(df, title):
+    rows = []
+    # Data rows
+    for index, row in df.iterrows():
+        # row_cells = [{"type": "plain_text", "text": str(row[col]), "emoji": True} for col in df.columns]
+        rows.append({"type": "section", "text": {"type": "plain_text", "text": " | ".join(str(row[col]) for col in df.columns)}})
+
+    # Adaptive Card structure
+    adaptive_card_body = {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"*{title}*"
+        }
+    }
+
+    contents = {
+        "blocks": [
+            adaptive_card_body,
+            {
+                "type": "divider"
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": " | ".join(df.columns)
+                }
+            },
+            *rows
+        ]
+    }
+
     return contents
 
 def run_nvidia_smi():
@@ -241,6 +292,44 @@ def construct_message(title, gpu_usage_list):
     return content
 
 
+def construct_slack_message(title, gpu_usage_list):
+    blocks = []
+
+    # Title block
+    blocks.append({
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"*{title} 사용률*",
+        }
+    })
+
+    # GPU usage details
+    for idx, gpu_usage in enumerate(gpu_usage_list):
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"GPU {idx}: {gpu_usage}%"
+            }
+        })
+
+    # Average usage block
+    average_usage = sum(gpu_usage_list) / len(gpu_usage_list)
+    blocks.append({
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"*평균 사용률: {average_usage:.2f}%*",
+        }
+    })
+
+    message = {
+        "blocks": blocks
+    }
+
+    return message
+
 def get_daily_usage():
     # Path to the file containing GPU usage data
     date = datetime.now().strftime('%Y%m%d')
@@ -256,8 +345,10 @@ def test_gpu_info_parse():
 def send_realtime_usage():
     nvidia_smi_result = run_nvidia_smi()
     gpu_df = get_gpu_info(nvidia_smi_result)
-    card_content = create_teams_table_card(gpu_df, 'TITLE')
-    send_teams_message(card_content, TARGET_WEBHOOK_URL_REALTIME)
+    # card_content = create_teams_table_card(gpu_df, 'TITLE')
+    # send_teams_message(card_content, TARGET_WEBHOOK_URL_REALTIME)
+    slack_content = create_slack_table_card(gpu_df, GPU_NAME)
+    send_slack_message(slack_content, SLACK_WEBHOOK_URL_REALTIME)
 
 def save_realtime_usage():
     nvidia_smi_result = run_nvidia_smi()
@@ -269,8 +360,10 @@ def send_daily_usage():
     save_to_daily_usage(daily_avg)
     gpu_usage_list = daily_avg['gpu_usage'].tolist()
     date = datetime.now().strftime('%Y.%m.%d')
-    content = construct_message(date, gpu_usage_list)
-    send_teams_message(content, TARGET_WEBHOOK_URL)
+    # content = construct_message(date, gpu_usage_list)
+    # send_teams_message(content, TARGET_WEBHOOK_URL)
+    slack_content = construct_slack_message("[%s] %s 일일사용률"%(GPU_NAME, date), gpu_usage_list)
+    send_slack_message(slack_content, SLACK_WEBHOOK_URL)
 
 def send_period_average():
     month = datetime.now().strftime('%m')
@@ -280,8 +373,10 @@ def send_period_average():
     gpu_usage_list = average_usage['gpu_usage'].tolist()
     month = datetime.now().strftime('%m')
     period = get_period(month)
-    content = construct_message(str(period)+"분기", gpu_usage_list)
-    send_teams_message(content, TARGET_WEBHOOK_URL)
+    # content = construct_message(GPU_NAME+" "+str(period)+"분기", gpu_usage_list)
+    # send_teams_message(content, TARGET_WEBHOOK_URL)
+    slack_content = construct_slack_message("[%s] %s분기사용률"%(GPU_NAME, str(period)), gpu_usage_list)
+    send_slack_message(slack_content, SLACK_WEBHOOK_URL)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:

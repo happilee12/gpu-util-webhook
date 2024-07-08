@@ -1,5 +1,5 @@
 # 새로운 crontab 항목 추가할 명령어
-GPU_USAGE_FILE_PATH="/home/vln/90_query_gpu_public/gpu_usage.py"
+GPU_USAGE_FILE_PATH="/home/vln/00_backup/98_gpu_util/gpu_usage.py"
 
 # 현재 crontab을 백업
 crontab -l > mycron
