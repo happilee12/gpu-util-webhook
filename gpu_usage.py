@@ -8,10 +8,8 @@ import json
 import requests
 import sys
 import re
-from my_url import GPU_NAME, SLACK_WEBHOOK_URL, SLACK_WEBHOOK_URL_REALTIME 
+from my_url import GPU_NAME, SLACK_WEBHOOK_URL, SLACK_WEBHOOK_URL_REALTIME, GPU_DAILY_USAGE_DIR, GPU_REALTIME_USAGE_DIR
 
-GPU_REALTIME_USAGE_DIR = "./daily/"
-GPU_DAILY_USAGE_DIR = "./daily_avg/"
 
 def send_teams_message(content, webhook_url):
     message = {
