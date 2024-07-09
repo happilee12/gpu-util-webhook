@@ -1,18 +1,23 @@
 ## HOW TO USE
 
-### 01. change these in `my_url.py`
+![sample output](./gpu_monitor_slack.png)
+
+### 01. Set up a slack incoming webhook
+https://api.slack.com/messaging/webhooks
+
+### 02. change urls to the target url in `my_url.py`
 * SLACK_WEBHOOK_URL_REALTIME = 'https://your_webhook_url'
 * SLACK_WEBHOOK_URL = 'https://your_webhook_url'
-* GPU_REALTIME_USAGE_DIR = "./daily/"
-* GPU_DAILY_USAGE_DIR = "./daily_avg/"
+* GPU_REALTIME_USAGE_DIR = "FULL/PATH/TO/SAVE/GPU/USAGE/PER/1MINUTE/daily/"
+* GPU_DAILY_USAGE_DIR = "FULL/PATH/TO/SAVE/DAILY/GPU/USAGE/daily_avg"
 
-### 02. change this to current path in  `add_cron.sh`
-* GPU_USAGE_FILE_PATH="/home/vln/90_query_gpu_public/gpu_usage.py"
+### 03. change this to current path in  `add_cron.sh`
+* GPU_USAGE_FILE_PATH="/FULL/PATH/TO/CURRENT/DIRECTORY/gpu_usage.py"
 
-### 03. install pandas
+### 04. install pandas
 ```pip install pandas```
 
-### 04. run 
+### 05. run 
 ```bash add_cron.sh```
 - this command will add cronjob in your server
 - to check existing cronjobs, run ```crontab -e```
@@ -20,8 +25,23 @@
 
 ## Troubleshooting
 
+thie program runs the following commands periodically (see `add_cron.sh` for details)
+if there's any issue, please run these commands in command line and see if there's any error 
+`GPU_USAGE_FILE_PATH="/FULL/PATH/TO/CURRENT/DIRECTORY/gpu_usage.py"`
+* 01. send realtime gpu usage to slack
+`/usr/bin/python3 $GPU_USAGE_FILE_PATH send_realtime_usage`
+* 02. save gpu usage 
+`/usr/bin/python3 $GPU_USAGE_FILE_PATH save_realtime_usage`
+* 03. calculate daily gpu usage  and send to slack
+`/usr/bin/python3 $GPU_USAGE_FILE_PATH send_daily_usage`
+* 04. calculate gpu usage for this period and send to slack 
+`/usr/bin/python3 $GPU_USAGE_FILE_PATH send_period_average`
+
 ### GPU usage info is empty
-run ```python3 /home/vln/00_backup/98_gpu_util/gpu_usage.py test_gpu_info_parse```
+sometimes `nvidia-smi` format could be different in each server. 
+please run this command to see if it's parsing fine as expected.
+If there's any issue please see `get_gpu_info` in `gpu_usage.py`
+```python3  $GPU_USAGE_FILE_PATH test_gpu_info_parse```
 
 expected output:
 ```
