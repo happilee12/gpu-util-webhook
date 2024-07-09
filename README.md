@@ -1,6 +1,13 @@
-## HOW TO USE
-
 ![sample output](./gpu_monitor_slack.png)
+
+## Introduction
+This program works as follwing.
+1. Query GPU usage every minute and save it to GPU_REALTIME_USAGE_DIR.
+2. Query GPU usage every 10 minutes and send a Slack message with the information.
+3. Once a day, calculate the average GPU usage for the day from the data in GPU_REALTIME_USAGE_DIR, save it to GPU_DAILY_USAGE_DIR, and send a Slack message with the daily average usage.
+4. Once a day, calculate the average GPU usage for the current quarter (January-March, April-June, July-September, October-December) from the data in GPU_DAILY_USAGE_DIR and send the average usage via Slack.
+
+## HOW TO USE
 
 ### 01. Set up a slack incoming webhook
 https://api.slack.com/messaging/webhooks
