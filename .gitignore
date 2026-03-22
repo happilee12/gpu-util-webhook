@@ -1,0 +1,47 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Packaging
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+.env/
+
+# Local config and secrets
+.tmp-config.toml
+config.toml
+*.local.toml
+.env
+.env.*
+*.secret
+*.secrets
+.pypirc
+
+# Runtime data
+.tmp-data/
+data/
+*.log
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+
+
+## data files
+data
