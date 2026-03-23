@@ -1,5 +1,7 @@
 # gpumanager
 
+**WARNING!!!** This branch is DEPRECATED. Please see the `pip-release` branch for the official release and latest updates.
+
 `gpumanager` is now officially released on PyPI.
 
 - PyPI: https://pypi.org/project/gpumanager/
