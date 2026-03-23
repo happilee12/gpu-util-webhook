@@ -5,6 +5,7 @@
 The installable Python distribution is named `gpumanager`. The CLI entrypoint is `gpumanager`.
 
 Website: https://happilee12.github.io/gpu-util-webhook/
+Pip Page: https://pypi.org/project/gpumanager/
 
 ## Features
 
