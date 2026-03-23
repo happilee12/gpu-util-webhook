@@ -215,7 +215,8 @@
         <div>
           <span class="eyebrow">GPU Reporting Utility</span>
           <h1>gpumanager</h1>
-          <p>Sample NVIDIA GPU utilization, store each snapshot as a CSV file, aggregate usage over a configurable window, and send a Slack report on your own schedule.</p>
+          <p><strong>Website:</strong> <a href="https://happilee12.github.io/gpu-util-webhook/">https://happilee12.github.io/gpu-util-webhook/</a></p>
+          <p>Sample NVIDIA GPU utilization, store each snapshot as a CSV file, aggregate usage over a configurable window, and send a Slack report on your own schedule. gpumanager is meant to be used together with a Slack incoming webhook.</p>
           <div class="hero-actions">
             <a class="button" href="#quick-start">Quick start</a>
             <a class="button alt" href="#commands">Commands</a>
@@ -281,12 +282,12 @@ interval = "1h"
 
 [general]
 timezone = "Asia/Seoul"
-server_name = "AICA_H100"</pre></div>
+server_name = "my_server"</pre></div>
       </article>
 
       <article class="card two-up">
         <h2>Report format</h2>
-        <div class="command-block"><pre>[AICA_H100] 2025.09.06 16:49:32 KST
+        <div class="command-block"><pre>[my_server] 2025.09.06 16:49:32 KST
 Window: last 1h
 GPU 0: 31.38%
 GPU 1: 29.39%
@@ -297,6 +298,7 @@ GPU 3: 56.36%</pre></div>
       <article class="card wide">
         <h2>How to setup a Slack webhook</h2>
         <p>This section is intentionally left as a placeholder so project-specific setup steps can be added later.</p>
+        <p>gpumanager sends notifications through a Slack incoming webhook.</p>
         <p>Official Slack guide: <a href="https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/">Sending messages using incoming webhooks</a></p>
       </article>
 

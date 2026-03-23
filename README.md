@@ -1,8 +1,10 @@
 # gpumanager
 
-`gpumanager` is a lightweight Python CLI tool for sampling NVIDIA GPU utilization, storing minute-by-minute CSV snapshots, aggregating utilization over a reporting window, and sending GPU-wise summaries to Slack.
+`gpumanager` is a lightweight Python CLI tool for sampling NVIDIA GPU utilization, storing minute-by-minute CSV snapshots, aggregating utilization over a reporting window, and sending GPU-wise summaries to Slack. It is designed to work together with a Slack incoming webhook for notifications.
 
 The installable Python distribution is named `gpumanager`. The CLI entrypoint is `gpumanager`.
+
+Website: https://happilee12.github.io/gpu-util-webhook/
 
 ## Features
 
@@ -136,12 +138,16 @@ Sampling examples:
 
 ## Before Running Reports
 
-A few things must be prepared by the user before `gpumanager` can collect data and send Slack notifications:
+A few things must be prepared by the user before `gpumanager` can collect data and send Slack notifications through a Slack incoming webhook:
 
 - `nvidia-smi` must work on the server
 - A valid Slack incoming webhook URL must be configured
 - The CSV storage directory must be writable
 - If you want automatic collection and reporting, the user-level `systemd` timers must be enabled
+
+Slack incoming webhook setup reference:
+
+- https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/
 
 Quick manual verification:
 

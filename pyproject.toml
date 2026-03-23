@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gpumanager"
-version = "0.2.0"
+version = "0.2.1"
 description = "Lightweight NVIDIA GPU utilization sampler, Slack reporter, and systemd timer helper"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -33,6 +33,9 @@ classifiers = [
   "Topic :: System :: Monitoring",
   "Topic :: System :: Systems Administration",
 ]
+
+[project.urls]
+Website = "https://happilee12.github.io/gpu-util-webhook/"
 
 [project.scripts]
 gpumanager = "gpumanager.cli:main"
