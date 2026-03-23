@@ -14,13 +14,22 @@ from gpumanager.config import Config, config_to_display_dict, load_config, save_
 from gpumanager.report import make_report, render_report_message
 from gpumanager.slack import send_slack_message
 from gpumanager.storage import csv_files_in_range, delete_files, write_sample_csv
-from gpumanager.systemd import SYSTEMD_USER_DIR, install_user_units, uninstall_user_units
+from gpumanager.systemd import (
+    SYSTEMD_USER_DIR,
+    cron_to_on_calendar,
+    disable_report_timer,
+    disable_sample_timer,
+    install_user_units,
+    sync_installed_user_units,
+    uninstall_user_units,
+)
 
 
 CONFIG_KEYS = [
     "slack.webhook_url",
     "storage.csv_dir",
-    "report.send_time",
+    "sample.interval",
+    "report.report_time",
     "report.interval",
     "general.timezone",
     "general.server_name",
@@ -57,6 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("status", help="Show runtime and configuration status")
     subparsers.add_parser("install-systemd", help="Install user-level systemd services and timers")
     subparsers.add_parser("uninstall-systemd", help="Remove user-level systemd services and timers")
+    subparsers.add_parser("disable-sample", help="Disable the sample timer")
+    subparsers.add_parser("disable-report", help="Disable the report timer")
     return parser
 
 
@@ -86,6 +97,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             return command_install_systemd(args.config)
         if args.command == "uninstall-systemd":
             return command_uninstall_systemd()
+        if args.command == "disable-sample":
+            return command_disable_sample()
+        if args.command == "disable-report":
+            return command_disable_report()
     except KeyboardInterrupt:
         print("Cancelled.", file=sys.stderr)
         return 130
@@ -99,18 +114,24 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 def command_init(config_path: Optional[str]) -> int:
     config = load_config(config_path, allow_missing=True)
-    tz = ZoneInfo(config.timezone)
-    now = datetime.now(tz)
-    print("Current server time: {0}".format(now.strftime("%Y-%m-%d %H:%M:%S %Z")))
+    now = _print_current_server_time(config.timezone)
     config.server_name = _prompt("Server name", config.server_name)
     config.webhook_url = _prompt("Slack webhook URL", config.webhook_url)
     config.csv_dir = Path(_prompt("CSV storage directory", str(config.csv_dir))).expanduser()
-    config.send_time = _prompt("Report send time (HH:MM)", config.send_time)
-    config.interval = _prompt("Report interval (e.g. 1d, 12h, 30m)", config.interval)
+    config.sample_interval = _prompt("Sample interval (e.g. 30s, 2m, 15m, 1h)", config.sample_interval)
+    _print_report_time_examples()
+    config.report_time = _prompt(
+        "Report time cron (minute hour day month weekday)",
+        config.report_time or _cron_example(now),
+    )
+    config.interval = _prompt("Report window (e.g. 1m, 1h, 12h, 1d)", config.interval)
     config.timezone = _prompt("Timezone", config.timezone)
     _validate_config(config)
     saved = save_config(config, config_path)
+    synced = sync_installed_user_units(config)
     print("Saved configuration to {0}".format(saved))
+    if synced:
+        print("Reloaded installed timers: {0}".format(", ".join(synced)))
     return 0
 
 
@@ -120,17 +141,25 @@ def command_config_set(config_path: Optional[str], key: Optional[str] = None, va
         update_config_value(config, key, value)
         _validate_config(config)
         saved = save_config(config, config_path)
+        synced = sync_installed_user_units(config)
         print("Updated {0} in {1}".format(key, saved))
+        if synced:
+            print("Reloaded installed timers: {0}".format(", ".join(synced)))
         return 0
 
+    now = _print_current_server_time(config.timezone)
+    _print_report_time_examples()
     for item in CONFIG_KEYS:
-        current = _get_config_value(config, item)
+        current = _get_config_value(config, item, now)
         answer = _prompt(item, current, allow_empty=True)
         if answer:
             update_config_value(config, item, answer)
     _validate_config(config)
     saved = save_config(config, config_path)
+    synced = sync_installed_user_units(config)
     print("Saved configuration to {0}".format(saved))
+    if synced:
+        print("Reloaded installed timers: {0}".format(", ".join(synced)))
     return 0
 
 
@@ -194,11 +223,16 @@ def command_status(config_path: Optional[str]) -> int:
         "slack.webhook_url": config.webhook_url,
         "csv_dir": str(config.csv_dir),
         "csv_dir_exists": config.csv_dir.exists(),
+        "sample.interval": config.sample_interval,
+        "report.report_time": config.report_time,
+        "report.on_calendar": cron_to_on_calendar(config.report_time),
+        "report.interval": config.interval,
+        "general.timezone": config.timezone,
+        "general.server_name": config.server_name,
         "nvidia_smi": nvidia_smi_path(),
         "systemctl": shutil.which("systemctl"),
         "sample_timer_installed": sample_timer.exists(),
         "report_timer_installed": report_timer.exists(),
-        "general.server_name": config.server_name,
     }
     print(json.dumps(status, indent=2))
     return 0
@@ -212,6 +246,18 @@ def command_install_systemd(config_path: Optional[str]) -> int:
     for path in written:
         print(path)
     print("Enable with: systemctl --user enable --now gpumanager-sample.timer gpumanager-report.timer")
+    return 0
+
+
+def command_disable_sample() -> int:
+    disable_sample_timer()
+    print("Disabled gpumanager-sample.timer")
+    return 0
+
+
+def command_disable_report() -> int:
+    disable_report_timer()
+    print("Disabled gpumanager-report.timer")
     return 0
 
 
@@ -236,13 +282,15 @@ def _prompt(label: str, current: str, allow_empty: bool = False) -> str:
     return current
 
 
-def _get_config_value(config: Config, key: str) -> str:
+def _get_config_value(config: Config, key: str, now: Optional[datetime] = None) -> str:
     if key == "slack.webhook_url":
         return config.webhook_url
     if key == "storage.csv_dir":
         return str(config.csv_dir)
-    if key == "report.send_time":
-        return config.send_time
+    if key == "sample.interval":
+        return config.sample_interval
+    if key == "report.report_time":
+        return config.report_time or _cron_example(now)
     if key == "report.interval":
         return config.interval
     if key == "general.timezone":
@@ -254,7 +302,34 @@ def _get_config_value(config: Config, key: str) -> str:
 
 def _validate_config(config: Config) -> None:
     ZoneInfo(config.timezone)
-    datetime.strptime(config.send_time, "%H:%M")
+    _validate_duration(config.sample_interval, "sample.interval")
+    cron_to_on_calendar(config.report_time)
     value = config.interval.strip().lower()
     if len(value) < 2 or not value[:-1].isdigit() or value[-1] not in {"d", "h", "m"}:
         raise ValueError("report.interval must look like 1d, 12h, or 30m")
+
+
+def _print_current_server_time(timezone_name: str) -> datetime:
+    tz = ZoneInfo(timezone_name)
+    now = datetime.now(tz)
+    print("Current server time: {0}".format(now.strftime("%Y-%m-%d %H:%M:%S %Z")))
+    return now
+
+
+def _print_report_time_examples() -> None:
+    print("Report time examples:")
+    print("  Every day at 09:00  -> 0 9 * * *")
+    print("  Every hour          -> 0 * * * *")
+    print("  Every 10 minutes    -> */10 * * * *")
+
+
+def _cron_example(now: Optional[datetime]) -> str:
+    if not now:
+        return "0 9 * * *"
+    return "{0} {1} * * *".format(now.minute, now.hour)
+
+
+def _validate_duration(value: str, label: str) -> None:
+    normalized = value.strip().lower()
+    if len(normalized) < 2 or not normalized[:-1].isdigit() or normalized[-1] not in {"s", "m", "h", "d"}:
+        raise ValueError("{0} must be a number followed by s, m, h, or d (for example: 11s, 2m, 1h, 1d)".format(label))

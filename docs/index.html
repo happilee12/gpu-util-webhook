@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gpumanager</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --paper: rgba(255, 251, 245, 0.88);
+      --ink: #1f2a2c;
+      --muted: #55676c;
+      --accent: #0d7a6d;
+      --accent-soft: #d7efe9;
+      --line: rgba(31, 42, 44, 0.12);
+      --shadow: 0 24px 60px rgba(25, 38, 38, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(13, 122, 109, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(201, 119, 55, 0.16), transparent 24%),
+        linear-gradient(180deg, #f8f4ed 0%, var(--bg) 100%);
+      line-height: 1.6;
+    }
+
+    .shell {
+      width: min(1100px, calc(100% - 32px));
+      margin: 32px auto 56px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,247,238,0.86));
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -10% -30% 35%;
+      height: 260px;
+      background: radial-gradient(circle, rgba(13, 122, 109, 0.18), transparent 65%);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      padding: 52px 40px 40px;
+      display: grid;
+      gap: 28px;
+      grid-template-columns: 1.3fr 0.9fr;
+      align-items: end;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { font-family: "IBM Plex Serif", Georgia, serif; line-height: 1.1; }
+    h1 { font-size: clamp(2.6rem, 5vw, 4.6rem); margin: 14px 0 12px; }
+    h2 { font-size: clamp(1.8rem, 3vw, 2.5rem); margin: 0 0 12px; }
+    h3 { font-size: 1.25rem; margin: 0 0 10px; }
+    p { margin: 0 0 14px; color: var(--muted); }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 18px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: var(--ink);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .button.alt {
+      background: transparent;
+      border-color: var(--line);
+      color: var(--ink);
+    }
+
+    .hero-card {
+      background: #182527;
+      color: #edf4f1;
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .hero-card pre,
+    pre {
+      margin: 0;
+      overflow-x: auto;
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .card {
+      grid-column: span 12;
+      background: var(--paper);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 26px;
+      box-shadow: var(--shadow);
+    }
+
+    .card.two-up { grid-column: span 6; }
+    .card.wide { grid-column: span 12; }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    li + li { margin-top: 8px; }
+
+    .command-block {
+      background: #142123;
+      color: #f2f6f4;
+      border-radius: 18px;
+      padding: 18px;
+      margin-top: 16px;
+    }
+
+    .note {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent);
+      background: rgba(215, 239, 233, 0.65);
+      color: var(--ink);
+      border-radius: 14px;
+    }
+
+    .placeholder {
+      margin-top: 18px;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .placeholder img {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #fff;
+    }
+
+    .caption {
+      margin-top: 10px;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    code {
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      background: rgba(24, 37, 39, 0.06);
+      padding: 0.12rem 0.35rem;
+      border-radius: 6px;
+      color: var(--ink);
+    }
+
+    footer {
+      margin: 22px 0 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 860px) {
+      .hero-inner { grid-template-columns: 1fr; padding: 34px 24px 24px; }
+      .card.two-up { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <span class="eyebrow">GPU Reporting Utility</span>
+          <h1>gpumanager</h1>
+          <p>Sample NVIDIA GPU utilization, store each snapshot as a CSV file, aggregate usage over a configurable window, and send a Slack report on your own schedule.</p>
+          <div class="hero-actions">
+            <a class="button" href="#quick-start">Quick start</a>
+            <a class="button alt" href="#commands">Commands</a>
+          </div>
+        </div>
+        <div class="hero-card">
+<pre>pipx install gpumanager
+pipx ensurepath
+source ~/.bashrc
+
+gpumanager install-systemd
+gpumanager init
+gpumanager sample
+gpumanager test</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card two-up">
+        <h2>What it does</h2>
+        <ul>
+          <li>Collects GPU utilization data through <code>nvidia-smi</code>.</li>
+          <li>Writes one CSV file per sample so the data remains simple and inspectable.</li>
+          <li>Aggregates average utilization by GPU and sends a Slack summary.</li>
+          <li>Supports interactive setup, runtime status checks, and user-level systemd timers.</li>
+        </ul>
+      </article>
+
+      <article class="card two-up" id="quick-start">
+        <h2>Quick start</h2>
+        <div class="command-block"><pre>gpumanager install-systemd
+gpumanager init</pre></div>
+        <p class="note">If you install with <code>pipx</code>, run <code>pipx ensurepath</code> and reload your shell once so the <code>gpumanager</code> command is available.</p>
+      </article>
+
+      <article class="card wide" id="commands">
+        <h2>Core commands</h2>
+        <ul>
+          <li><code>gpumanager init</code> sets up the Slack webhook, storage directory, sample interval, report time, report window, timezone, and server name.</li>
+          <li><code>gpumanager sample</code> collects the current GPU utilization and writes a CSV snapshot.</li>
+          <li><code>gpumanager test</code> uses existing CSV data and sends a test Slack message.</li>
+          <li><code>gpumanager install-systemd</code> installs the user services and timers.</li>
+          <li><code>gpumanager disable-sample</code> and <code>gpumanager disable-report</code> stop sampling or reporting independently.</li>
+          <li><code>gpumanager status</code> shows the active configuration path, timers, webhook URL, and local runtime details.</li>
+        </ul>
+      </article>
+
+      <article class="card two-up">
+        <h2>Configuration example</h2>
+        <div class="command-block"><pre>[slack]
+webhook_url = "https://hooks.slack.com/services/..."
+
+[storage]
+csv_dir = "/var/lib/gpumanager"
+
+[sample]
+interval = "30s"
+
+[report]
+report_time = "0 * * * *"
+interval = "1h"
+
+[general]
+timezone = "Asia/Seoul"
+server_name = "AICA_H100"</pre></div>
+      </article>
+
+      <article class="card two-up">
+        <h2>Report format</h2>
+        <div class="command-block"><pre>[AICA_H100] 2025.09.06 16:49:32 KST
+Window: last 1h
+GPU 0: 31.38%
+GPU 1: 29.39%
+GPU 2: 31.57%
+GPU 3: 56.36%</pre></div>
+      </article>
+
+      <article class="card wide">
+        <h2>How to setup a Slack webhook</h2>
+        <p>This section is intentionally left as a placeholder so project-specific setup steps can be added later.</p>
+      </article>
+
+      <article class="card wide">
+        <h2>Run example</h2>
+        <p>This section is ready for screenshots or diagrams showing the live sampling and reporting flow.</p>
+        <div class="placeholder">
+          <img src="assets/run-example-placeholder.svg" alt="Placeholder image for future gpumanager run example">
+        </div>
+        <p class="caption">Replace this placeholder image with a real capture later.</p>
+      </article>
+    </section>
+
+    <footer>
+      Built for lightweight GPU utilization reporting on Linux servers.
+    </footer>
+  </main>
+</body>
+</html>

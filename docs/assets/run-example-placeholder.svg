@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <rect width="1600" height="900" fill="#FCFAF6"/>
+  <rect x="80" y="80" width="1440" height="740" rx="32" fill="#FFFFFF" stroke="#D6D0C7" stroke-width="4" stroke-dasharray="16 16"/>
+  <text x="800" y="420" text-anchor="middle" fill="#1F2A2C" font-family="IBM Plex Sans, Segoe UI, sans-serif" font-size="42" font-weight="700">Run example image placeholder</text>
+  <text x="800" y="480" text-anchor="middle" fill="#55676C" font-family="IBM Plex Sans, Segoe UI, sans-serif" font-size="26">Replace this file with your screenshot later</text>
+</svg>

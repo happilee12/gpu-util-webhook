@@ -35,6 +35,13 @@ pip install .
 pipx install .
 ```
 
+If you install with `pipx`, make sure the `pipx` binary path is added to your shell:
+
+```bash
+pipx ensurepath
+source ~/.bashrc
+```
+
 After publishing:
 
 ```bash
@@ -43,14 +50,30 @@ pip install gpumanager
 pipx install gpumanager
 ```
 
+After a published `pipx` install, run this once if needed:
+
+```bash
+pipx ensurepath
+source ~/.bashrc
+```
+
 ## Quick Start
 
 ```bash
+gpumanager install-systemd
 gpumanager init
+```
+
+During `init` and interactive `config set`, the CLI shows the current server time and a few common cron examples so it is easier to enter `report.report_time`.
+
+## Test
+
+```bash
 gpumanager sample
 gpumanager test
-gpumanager install-systemd
 ```
+
+If systemd timers are already installed, `gpumanager init` and `gpumanager config set` automatically rewrite and reload the installed timer files so schedule changes take effect immediately.
 
 ## Commands
 
@@ -64,6 +87,8 @@ gpumanager install-systemd
 - `gpumanager status`
 - `gpumanager install-systemd`
 - `gpumanager uninstall-systemd`
+- `gpumanager disable-sample`
+- `gpumanager disable-report`
 
 ## Configuration
 
@@ -83,14 +108,31 @@ webhook_url = "https://hooks.slack.com/services/..."
 [storage]
 csv_dir = "/var/lib/gpumanager"
 
+[sample]
+interval = "1m"
+
 [report]
-send_time = "09:00"
-interval = "1d"
+report_time = "0 9 * * *"
+interval = "1h"
 
 [general]
 timezone = "Asia/Seoul"
 server_name = "AICA_H100"
 ```
+
+Common `report_time` examples:
+
+- Every day at 09:00: `0 9 * * *`
+- Every hour: `0 * * * *`
+- Every 10 minutes: `*/10 * * * *`
+
+Sampling examples:
+
+- Every 7 seconds: `7s`
+- Every 30 seconds: `30s`
+- Every 2 minutes: `2m`
+- Every 15 minutes: `15m`
+- Every hour: `1h`
 
 ## Before Running Reports
 
@@ -112,19 +154,12 @@ gpumanager test
 
 ## Automatic Scheduling
 
-`gpumanager` does not start background collection on its own. To run sampling every minute and reporting at the configured send time, install and enable the user timers.
+`gpumanager` does not start background collection on its own. To run sampling every minute and reporting on the configured cron-style schedule, install and enable the user timers.
 
-Install unit files:
+Install and enable timer files:
 
 ```bash
 gpumanager install-systemd
-```
-
-Enable timers:
-
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now gpumanager-sample.timer gpumanager-report.timer
 ```
 
 Check timer status:
@@ -134,12 +169,18 @@ systemctl --user status gpumanager-sample.timer
 systemctl --user status gpumanager-report.timer
 ```
 
-Stop automatic scheduling later if needed:
+Disable only sampling:
 
 ```bash
-systemctl --user disable --now gpumanager-sample.timer gpumanager-report.timer
-gpumanager uninstall-systemd
+gpumanager disable-sample
 ```
+
+Disable only reporting:
+
+```bash
+gpumanager disable-report
+```
+
 
 ## Sampling
 
@@ -185,16 +226,11 @@ GPU 7: 63.93%
 - `gpumanager-report.service`
 - `gpumanager-report.timer`
 
-Then enable them with:
-
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now gpumanager-sample.timer gpumanager-report.timer
-```
 
 ## Notes
 
-- The report timer runs daily at the configured `send_time`
-- The report window is controlled by `report.interval`
+- `report.report_time` uses a 5-field cron string such as `0 9 * * *`
+- `sample.interval` controls how often GPU utilization is sampled and saved
+- `report.interval` controls the aggregation window shown as `Window: last ...` and supports minute-based values such as `1m`
 - Missing samples are ignored during aggregation
 - The README content is used as the package long description, so this setup guide will also be visible on package index web pages after publishing

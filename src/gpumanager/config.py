@@ -13,13 +13,16 @@ ENV_VAR_NAME = "GPUMANAGER_CONFIG"
 DEFAULT_USER_CONFIG = Path.home() / ".config" / APP_DIR_NAME / "config.toml"
 DEFAULT_SYSTEM_CONFIG = Path("/etc") / APP_DIR_NAME / "config.toml"
 DEFAULT_CSV_DIR = Path.home() / ".local" / "share" / APP_DIR_NAME
+DEFAULT_REPORT_TIME = "0 9 * * *"
+DEFAULT_SAMPLE_INTERVAL = "1m"
 
 
 @dataclass
 class Config:
     webhook_url: str = ""
     csv_dir: Path = DEFAULT_CSV_DIR
-    send_time: str = "09:00"
+    sample_interval: str = DEFAULT_SAMPLE_INTERVAL
+    report_time: str = DEFAULT_REPORT_TIME
     interval: str = "1d"
     timezone: str = "Asia/Seoul"
     server_name: str = ""
@@ -63,10 +66,16 @@ def load_config(explicit_path: Optional[str] = None, allow_missing: bool = False
     with path.open("rb") as handle:
         raw = tomllib.load(handle)
 
+    report_time = str(_get_nested(raw, "report", "report_time", default="")).strip()
+    if not report_time:
+        legacy_send_time = str(_get_nested(raw, "report", "send_time", default="09:00")).strip()
+        report_time = _legacy_send_time_to_cron(legacy_send_time)
+
     cfg = Config(
         webhook_url=str(_get_nested(raw, "slack", "webhook_url", default="")),
         csv_dir=Path(str(_get_nested(raw, "storage", "csv_dir", default=str(DEFAULT_CSV_DIR)))).expanduser(),
-        send_time=str(_get_nested(raw, "report", "send_time", default="09:00")),
+        sample_interval=str(_get_nested(raw, "sample", "interval", default=DEFAULT_SAMPLE_INTERVAL)),
+        report_time=report_time,
         interval=str(_get_nested(raw, "report", "interval", default="1d")),
         timezone=str(_get_nested(raw, "general", "timezone", default="Asia/Seoul")),
         server_name=str(_get_nested(raw, "general", "server_name", default="")),
@@ -87,7 +96,8 @@ def _render_toml(config: Config) -> str:
     values = {
         "slack": {"webhook_url": config.webhook_url},
         "storage": {"csv_dir": str(config.csv_dir)},
-        "report": {"send_time": config.send_time, "interval": config.interval},
+        "sample": {"interval": config.sample_interval},
+        "report": {"report_time": config.report_time, "interval": config.interval},
         "general": {"timezone": config.timezone, "server_name": config.server_name},
     }
     lines = []  # type: List[str]
@@ -104,7 +114,8 @@ def config_to_display_dict(config: Config) -> Dict[str, Any]:
         "config_path": str(config.path) if config.path else None,
         "slack.webhook_url": _mask_secret(config.webhook_url),
         "storage.csv_dir": str(config.csv_dir),
-        "report.send_time": config.send_time,
+        "sample.interval": config.sample_interval,
+        "report.report_time": config.report_time,
         "report.interval": config.interval,
         "general.timezone": config.timezone,
         "general.server_name": config.server_name,
@@ -117,8 +128,10 @@ def update_config_value(config: Config, key: str, value: str) -> None:
         config.webhook_url = value.strip()
     elif normalized == "storage.csv_dir":
         config.csv_dir = Path(value.strip()).expanduser()
-    elif normalized == "report.send_time":
-        config.send_time = value.strip()
+    elif normalized == "sample.interval":
+        config.sample_interval = value.strip()
+    elif normalized == "report.report_time":
+        config.report_time = value.strip()
     elif normalized == "report.interval":
         config.interval = value.strip()
     elif normalized == "general.timezone":
@@ -135,6 +148,20 @@ def _get_nested(data: Dict[str, Any], section: str, key: str, default: Any) -> A
     if not isinstance(data[section], dict):
         return default
     return data[section].get(key, default)
+
+
+def _legacy_send_time_to_cron(send_time: str) -> str:
+    parts = send_time.split(":")
+    if len(parts) != 2:
+        return DEFAULT_REPORT_TIME
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1])
+    except ValueError:
+        return DEFAULT_REPORT_TIME
+    if hour not in range(24) or minute not in range(60):
+        return DEFAULT_REPORT_TIME
+    return "{0} {1} * * *".format(minute, hour)
 
 
 def _escape_string(value: str) -> str:
