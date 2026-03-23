@@ -286,6 +286,36 @@ timezone = "Asia/Seoul"
 server_name = "my_server"</pre></div>
       </article>
 
+      <article class="card wide">
+        <h2>Recommended setup</h2>
+        <h3>1. Realtime report</h3>
+        <p>Check near-realtime GPU activity every 10 minutes.</p>
+        <div class="command-block"><pre>[sample]
+interval = "1m"
+
+[report]
+report_time = "*/10 * * * *"
+interval = "1m"</pre></div>
+
+        <h3 style="margin-top: 20px;">2. Daily Average report</h3>
+        <p>This matches the current default-style daily setup.</p>
+        <div class="command-block"><pre>[sample]
+interval = "1m"
+
+[report]
+report_time = "0 9 * * *"
+interval = "1d"</pre></div>
+
+        <h3 style="margin-top: 20px;">3. Weekly report</h3>
+        <p>Send one summary per week and aggregate the last 7 days.</p>
+        <div class="command-block"><pre>[sample]
+interval = "1m"
+
+[report]
+report_time = "0 9 * * 1"
+interval = "7d"</pre></div>
+      </article>
+
       <article class="card two-up">
         <h2>Report format</h2>
         <div class="command-block"><pre>[my_server] 2025.09.06 16:49:32 KST
@@ -294,6 +324,16 @@ GPU 0: 31.38%
 GPU 1: 29.39%
 GPU 2: 31.57%
 GPU 3: 56.36%</pre></div>
+      </article>
+
+      <article class="card wide">
+        <h2>Troubleshooting</h2>
+        <h3>4. Test</h3>
+        <p>After finishing the configuration, send a test report.</p>
+        <div class="command-block"><pre>gpumanager sample
+gpumanager test</pre></div>
+        <p>If the Slack message arrives normally, the setup is working.</p>
+        <p>If the message is delivered here but does not arrive at the scheduled time, <code>gpumanager install-systemd</code> may not have been run yet. In that case, run <code>gpumanager status</code> and check whether <code>sample_timer_installed</code> and <code>report_timer_installed</code> are set correctly.</p>
       </article>
 
       <article class="card wide">

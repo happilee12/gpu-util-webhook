@@ -69,12 +69,20 @@ gpumanager init
 
 During `init` and interactive `config set`, the CLI shows the current server time and a few common cron examples so it is easier to enter `report.report_time`.
 
-## Test
+## Troubleshooting
+
+### 4. Test
+
+After finishing the configuration, send a test report.
 
 ```bash
 gpumanager sample
 gpumanager test
 ```
+
+If the Slack message arrives normally, the setup is working.
+
+If the message is delivered here but does not arrive at the scheduled time, `gpumanager install-systemd` may not have been run yet. In that case, run `gpumanager status` and check whether `sample_timer_installed` and `report_timer_installed` are set correctly.
 
 If systemd timers are already installed, `gpumanager init` and `gpumanager config set` automatically rewrite and reload the installed timer files so schedule changes take effect immediately.
 
@@ -136,6 +144,47 @@ Sampling examples:
 - Every 2 minutes: `2m`
 - Every 15 minutes: `15m`
 - Every hour: `1h`
+
+## Recommended Setup
+
+### 1. Realtime report
+
+Check near-realtime GPU activity every 10 minutes.
+
+```toml
+[sample]
+interval = "1m"
+
+[report]
+report_time = "*/10 * * * *"
+interval = "1m"
+```
+
+### 2. Daily Average report
+
+This matches the current default-style daily setup.
+
+```toml
+[sample]
+interval = "1m"
+
+[report]
+report_time = "0 9 * * *"
+interval = "1d"
+```
+
+### 3. Weekly report
+
+Send one summary per week and aggregate the last 7 days.
+
+```toml
+[sample]
+interval = "1m"
+
+[report]
+report_time = "0 9 * * 1"
+interval = "7d"
+```
 
 ## Before Running Reports
 
