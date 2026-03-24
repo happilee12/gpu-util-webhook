@@ -230,8 +230,8 @@ source ~/.bashrc
 
 gpumanager install-systemd
 gpumanager init
-gpumanager sample
-gpumanager test</pre>
+gpumanager test-sample
+gpumanager test-report</pre>
         </div>
       </div>
     </section>
@@ -258,11 +258,12 @@ gpumanager init</pre></div>
         <h2>Core commands</h2>
         <ul>
           <li><code>gpumanager init</code> sets up the Slack webhook, storage directory, sample interval, report time, report window, timezone, and server name.</li>
-          <li><code>gpumanager sample</code> collects the current GPU utilization and writes a CSV snapshot.</li>
-          <li><code>gpumanager test</code> uses existing CSV data and sends a test Slack message.</li>
+          <li><code>gpumanager test-sample</code> collects the current GPU utilization and writes a CSV snapshot.</li>
+          <li><code>gpumanager test-report</code> aggregates existing CSV data and sends a Slack report immediately.</li>
           <li><code>gpumanager install-systemd</code> installs the user services and timers.</li>
           <li><code>gpumanager disable-sample</code> and <code>gpumanager disable-report</code> stop sampling or reporting independently.</li>
-          <li><code>gpumanager status</code> shows the active configuration path, timers, webhook URL, and local runtime details.</li>
+          <li><code>gpumanager reload</code> runs <code>systemctl --user daemon-reload</code> and restarts the installed gpumanager timers.</li>
+          <li><code>gpumanager status</code> shows the active configuration path, timers, webhook URL, local runtime details, and the next sample/report trigger times.</li>
         </ul>
       </article>
 
@@ -330,10 +331,10 @@ GPU 3: 56.36%</pre></div>
         <h2>Troubleshooting</h2>
         <h3>4. Test</h3>
         <p>After finishing the configuration, send a test report.</p>
-        <div class="command-block"><pre>gpumanager sample
-gpumanager test</pre></div>
+        <div class="command-block"><pre>gpumanager test-sample
+gpumanager test-report</pre></div>
         <p>If the Slack message arrives normally, the setup is working.</p>
-        <p>If the message is delivered here but does not arrive at the scheduled time, <code>gpumanager install-systemd</code> may not have been run yet. In that case, run <code>gpumanager status</code> and check whether <code>sample_timer_installed</code> and <code>report_timer_installed</code> are set correctly.</p>
+        <p>If the message is delivered here but does not arrive at the scheduled time, <code>gpumanager install-systemd</code> may not have been run yet. In that case, run <code>gpumanager status</code> and check <code>sample_timer_installed</code>, <code>report_timer_installed</code>, <code>sample.next_trigger</code>, and <code>report.next_trigger</code>.</p>
       </article>
 
       <article class="card wide">

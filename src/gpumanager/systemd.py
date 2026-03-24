@@ -34,7 +34,7 @@ def install_user_units(config: Config, python_executable: Optional[str] = None) 
         "gpumanager-sample.service": _sample_service(command),
         "gpumanager-sample.timer": _sample_timer(config.sample_interval),
         "gpumanager-report.service": _report_service(command),
-        "gpumanager-report.timer": _report_timer(config.report_time),
+        "gpumanager-report.timer": _report_timer(config.report_time, config.timezone),
     }
 
     written = []  # type: List[Path]
@@ -57,6 +57,17 @@ def disable_report_timer() -> None:
     _run_systemctl_user("disable", "--now", "gpumanager-report.timer")
 
 def sync_installed_user_units(config: Config, python_executable: Optional[str] = None) -> List[str]:
+    sample_timer = SYSTEMD_USER_DIR / "gpumanager-sample.timer"
+    report_timer = SYSTEMD_USER_DIR / "gpumanager-report.timer"
+
+    if not sample_timer.exists() and not report_timer.exists():
+        return []
+
+    install_user_units(config, python_executable=python_executable)
+    return reload_user_units()
+
+
+def reload_user_units() -> List[str]:
     changed = []  # type: List[str]
     sample_timer = SYSTEMD_USER_DIR / "gpumanager-sample.timer"
     report_timer = SYSTEMD_USER_DIR / "gpumanager-report.timer"
@@ -64,15 +75,13 @@ def sync_installed_user_units(config: Config, python_executable: Optional[str] =
     if not sample_timer.exists() and not report_timer.exists():
         return changed
 
-    install_user_units(config, python_executable=python_executable)
-
+    _run_systemctl_user("daemon-reload")
     if sample_timer.exists():
         _run_systemctl_user("restart", "gpumanager-sample.timer")
         changed.append("gpumanager-sample.timer")
     if report_timer.exists():
         _run_systemctl_user("restart", "gpumanager-report.timer")
         changed.append("gpumanager-report.timer")
-
     return changed
 
 
@@ -105,7 +114,7 @@ def _run_systemctl_user(*args: str) -> None:
 
 
 def _sample_service(command: List[str]) -> str:
-    exec_start = " ".join(shlex.quote(part) for part in [part for part in command] + ["sample"])
+    exec_start = " ".join(shlex.quote(part) for part in [part for part in command] + ["test-sample"])
     return "\n".join(
         [
             "[Unit]",
@@ -127,7 +136,7 @@ def _sample_timer(sample_interval: str) -> str:
             "Description=Run gpumanager sampling on a fixed interval",
             "",
             "[Timer]",
-            "OnBootSec=10",
+            "OnActiveSec=10",
             "OnUnitActiveSec={0}".format(seconds),
             "AccuracySec=1s",
             "Persistent=true",
@@ -140,7 +149,7 @@ def _sample_timer(sample_interval: str) -> str:
 
 
 def _report_service(command: List[str]) -> str:
-    exec_start = " ".join(shlex.quote(part) for part in [part for part in command] + ["report"])
+    exec_start = " ".join(shlex.quote(part) for part in [part for part in command] + ["test-report"])
     return "\n".join(
         [
             "[Unit]",
@@ -154,8 +163,8 @@ def _report_service(command: List[str]) -> str:
     ) + "\n"
 
 
-def _report_timer(report_time: str) -> str:
-    on_calendar = cron_to_on_calendar(report_time)
+def _report_timer(report_time: str, timezone: str) -> str:
+    on_calendar = cron_to_on_calendar(report_time, timezone)
     return "\n".join(
         [
             "[Unit]",
@@ -192,7 +201,7 @@ def interval_to_seconds(interval: str) -> int:
     raise ValueError("sample.interval must use s, m, h, or d")
 
 
-def cron_to_on_calendar(report_time: str) -> str:
+def cron_to_on_calendar(report_time: str, timezone: Optional[str] = None) -> str:
     parts = report_time.split()
     if len(parts) != 5:
         raise ValueError("report.report_time must be a 5-field cron string like '0 9 * * *'")
@@ -207,14 +216,16 @@ def cron_to_on_calendar(report_time: str) -> str:
     if weekday != "*":
         prefix = weekday + " "
 
-    return "{0}*-{1}-{2} {3}:{4}:00".format(
+    calendar = "{0}*-{1}-{2} {3}:{4}:00".format(
         prefix,
         _format_calendar_field(month),
         _format_calendar_field(day),
         _format_calendar_field(hour),
         _format_calendar_field(minute),
     )
-
+    if timezone:
+        return "{0} {1}".format(calendar, timezone.strip())
+    return calendar
 
 def _convert_numeric_field(field: str, minimum: int, maximum: int) -> str:
     if field == "*":

@@ -24,6 +24,7 @@ config.toml
 *.secret
 *.secrets
 .pypirc
+LOCAL_RELEASE_GUIDE.md
 
 # Runtime data
 .tmp-data/

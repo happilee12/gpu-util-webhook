@@ -67,7 +67,9 @@ gpumanager install-systemd
 gpumanager init
 ```
 
-During `init` and interactive `config set`, the CLI shows the current server time and a few common cron examples so it is easier to enter `report.report_time`.
+During `init`, the CLI shows the current server time and a few common cron examples so it is easier to enter `report.report_time`.
+
+If you edit the config file manually after timers are installed, run `gpumanager reload` to apply the updated systemd timer settings.
 
 ## Troubleshooting
 
@@ -76,30 +78,28 @@ During `init` and interactive `config set`, the CLI shows the current server tim
 After finishing the configuration, send a test report.
 
 ```bash
-gpumanager sample
-gpumanager test
+gpumanager test-sample
+gpumanager test-report
 ```
 
 If the Slack message arrives normally, the setup is working.
 
-If the message is delivered here but does not arrive at the scheduled time, `gpumanager install-systemd` may not have been run yet. In that case, run `gpumanager status` and check whether `sample_timer_installed` and `report_timer_installed` are set correctly.
+If the message is delivered here but does not arrive at the scheduled time, `gpumanager install-systemd` may not have been run yet. In that case, run `gpumanager status` and check `sample_timer_installed`, `report_timer_installed`, `sample.next_trigger`, and `report.next_trigger`. The next scheduled runs are visible directly in status output, for example `"sample.next_trigger": "Tue 2026-03-24 14:41:35 KST; 9s left"` and `"report.next_trigger": "Tue 2026-03-24 14:42:00 KST; 33s left"`.
 
-If systemd timers are already installed, `gpumanager init` and `gpumanager config set` automatically rewrite and reload the installed timer files so schedule changes take effect immediately.
+If systemd timers are already installed, `gpumanager init` automatically rewrites and reloads the installed timer files so schedule changes take effect immediately. If you edit the config file manually later, run `gpumanager reload`. 
 
 ## Commands
 
 - `gpumanager init`
-- `gpumanager config set`
-- `gpumanager config show`
-- `gpumanager sample`
-- `gpumanager report`
-- `gpumanager test`
+- `gpumanager test-sample`
+- `gpumanager test-report`
 - `gpumanager delete-csv`
 - `gpumanager status`
 - `gpumanager install-systemd`
 - `gpumanager uninstall-systemd`
 - `gpumanager disable-sample`
 - `gpumanager disable-report`
+- `gpumanager reload`
 
 ## Configuration
 
@@ -203,9 +203,9 @@ Quick manual verification:
 
 ```bash
 nvidia-smi
-gpumanager config show
-gpumanager sample
-gpumanager test
+gpumanager status
+gpumanager test-sample
+gpumanager test-report
 ```
 
 ## Automatic Scheduling
@@ -218,12 +218,14 @@ Install and enable timer files:
 gpumanager install-systemd
 ```
 
-Check timer status:
+Check timer status or reload installed timers:
 
 ```bash
-systemctl --user status gpumanager-sample.timer
-systemctl --user status gpumanager-report.timer
+gpumanager status
+gpumanager reload
 ```
+
+`gpumanager status` shows the next scheduled sample and report times through `sample.next_trigger` and `report.next_trigger`. 
 
 Disable only sampling:
 
