@@ -85,7 +85,7 @@ gpumanager test-report
 
 If the Slack message arrives normally, the setup is working.
 
-If the message is delivered here but does not arrive at the scheduled time, `gpumanager install-systemd` may not have been run yet. In that case, run `gpumanager status` and check `sample_timer_installed`, `report_timer_installed`, `sample.next_trigger`, and `report.next_trigger`. The next scheduled runs are visible directly in status output, for example `"sample.next_trigger": "Tue 2026-03-24 14:41:35 KST; 9s left"` and `"report.next_trigger": "Tue 2026-03-24 14:42:00 KST; 33s left"`.
+If the message is delivered here but does not arrive at the scheduled time, `gpumanager install-systemd` may not have been run yet. In that case, run `gpumanager status` and check `sample_timer_installed`, `report_timer_installed`, `sample.next_trigger`, and `report.next_trigger`. The next scheduled runs are visible directly in status output, for example `"sample.next_trigger": "Tue 2026-03-24 14:41:35 KST; 9s left"` and `"report.next_trigger": "Tue 2026-03-24 14:42:00 KST; 33s left"`. These two values are currently read by parsing the `Trigger:` line from `systemctl status gpumanager-sample.timer` and `systemctl status gpumanager-report.timer`.
 
 If systemd timers are already installed, `gpumanager init` automatically rewrites and reloads the installed timer files so schedule changes take effect immediately. If you edit the config file manually later, run `gpumanager reload`. 
 
@@ -232,7 +232,7 @@ gpumanager status
 gpumanager reload
 ```
 
-`gpumanager status` shows the next scheduled sample and report times through `sample.next_trigger` and `report.next_trigger`. 
+`gpumanager status` shows the next scheduled sample and report times through `sample.next_trigger` and `report.next_trigger`. These values are currently read by parsing the `Trigger:` line from `systemctl status gpumanager-sample.timer` and `systemctl status gpumanager-report.timer`.
 
 Disable only sampling:
 
