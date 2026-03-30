@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+import getpass
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import List, Optional
 
 from gpumanager.config import Config
 
 
-SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
+SYSTEMD_SYSTEM_DIR = Path("/etc") / "systemd" / "system"
 WEEKDAY_NAMES = {
     0: "Sun",
     1: "Mon",
@@ -23,97 +25,165 @@ WEEKDAY_NAMES = {
 }
 
 
-def install_user_units(config: Config, python_executable: Optional[str] = None) -> List[Path]:
-    SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
+def install_system_units(
+    config: Config,
+    python_executable: Optional[str] = None,
+    run_user: Optional[str] = None,
+) -> List[Path]:
     executable = python_executable or sys.executable
+    service_user = run_user or getpass.getuser()
     command = [executable, "-m", "gpumanager"]
     if config.path:
         command.extend(["--config", str(config.path)])
 
     units = {
-        "gpumanager-sample.service": _sample_service(command),
+        "gpumanager-sample.service": _sample_service(command, service_user),
         "gpumanager-sample.timer": _sample_timer(config.sample_interval),
-        "gpumanager-report.service": _report_service(command),
+        "gpumanager-report.service": _report_service(command, service_user),
         "gpumanager-report.timer": _report_timer(config.report_time, config.timezone),
     }
 
     written = []  # type: List[Path]
-    for name, content in units.items():
-        path = SYSTEMD_USER_DIR / name
-        path.write_text(content, encoding="utf-8")
-        written.append(path)
+    with tempfile.TemporaryDirectory(prefix="gpumanager-systemd-") as temp_dir:
+        temp_root = Path(temp_dir)
+        for name, content in units.items():
+            temp_path = temp_root / name
+            temp_path.write_text(content, encoding="utf-8")
+            target_path = SYSTEMD_SYSTEM_DIR / name
+            _run_root_command("install", "-m", "0644", str(temp_path), str(target_path))
+            written.append(target_path)
 
-    _run_systemctl_user("daemon-reload")
+    _run_systemctl("daemon-reload", require_root=True, capture_output=False)
     return written
 
 
-
-
 def disable_sample_timer() -> None:
-    _run_systemctl_user("disable", "--now", "gpumanager-sample.timer")
+    _run_systemctl("disable", "--now", "gpumanager-sample.timer", require_root=True, capture_output=False)
 
 
 def disable_report_timer() -> None:
-    _run_systemctl_user("disable", "--now", "gpumanager-report.timer")
+    _run_systemctl("disable", "--now", "gpumanager-report.timer", require_root=True, capture_output=False)
 
-def sync_installed_user_units(config: Config, python_executable: Optional[str] = None) -> List[str]:
-    sample_timer = SYSTEMD_USER_DIR / "gpumanager-sample.timer"
-    report_timer = SYSTEMD_USER_DIR / "gpumanager-report.timer"
+
+def enable_system_timers() -> None:
+    _run_systemctl(
+        "enable",
+        "--now",
+        "gpumanager-sample.timer",
+        "gpumanager-report.timer",
+        require_root=True,
+        capture_output=False,
+    )
+
+
+def sync_installed_system_units(
+    config: Config,
+    python_executable: Optional[str] = None,
+    run_user: Optional[str] = None,
+) -> List[str]:
+    sample_timer = SYSTEMD_SYSTEM_DIR / "gpumanager-sample.timer"
+    report_timer = SYSTEMD_SYSTEM_DIR / "gpumanager-report.timer"
 
     if not sample_timer.exists() and not report_timer.exists():
         return []
 
-    install_user_units(config, python_executable=python_executable)
-    return reload_user_units()
+    install_system_units(config, python_executable=python_executable, run_user=run_user)
+    return reload_system_units()
 
 
-def reload_user_units() -> List[str]:
+def reload_system_units() -> List[str]:
     changed = []  # type: List[str]
-    sample_timer = SYSTEMD_USER_DIR / "gpumanager-sample.timer"
-    report_timer = SYSTEMD_USER_DIR / "gpumanager-report.timer"
+    sample_timer = SYSTEMD_SYSTEM_DIR / "gpumanager-sample.timer"
+    report_timer = SYSTEMD_SYSTEM_DIR / "gpumanager-report.timer"
 
     if not sample_timer.exists() and not report_timer.exists():
         return changed
 
-    _run_systemctl_user("daemon-reload")
+    _run_systemctl("daemon-reload", require_root=True, capture_output=False)
     if sample_timer.exists():
-        _run_systemctl_user("restart", "gpumanager-sample.timer")
+        _run_systemctl("restart", "gpumanager-sample.timer", require_root=True, capture_output=False)
         changed.append("gpumanager-sample.timer")
     if report_timer.exists():
-        _run_systemctl_user("restart", "gpumanager-report.timer")
+        _run_systemctl("restart", "gpumanager-report.timer", require_root=True, capture_output=False)
         changed.append("gpumanager-report.timer")
     return changed
 
 
-def uninstall_user_units() -> List[Path]:
+def user_unit_paths(home_dir: Optional[Path] = None) -> List[Path]:
+    user_home = home_dir or Path.home()
+    user_dir = user_home / ".config" / "systemd" / "user"
+    return [
+        user_dir / "gpumanager-sample.timer",
+        user_dir / "gpumanager-sample.service",
+        user_dir / "gpumanager-report.timer",
+        user_dir / "gpumanager-report.service",
+    ]
+
+
+def find_conflicting_user_units(home_dir: Optional[Path] = None) -> List[Path]:
+    return [path for path in user_unit_paths(home_dir) if path.exists()]
+
+
+def uninstall_system_units() -> List[Path]:
     removed = []  # type: List[Path]
     for unit in ["gpumanager-sample.timer", "gpumanager-report.timer"]:
-        _run_systemctl_user("disable", "--now", unit)
+        _run_systemctl("disable", "--now", unit, require_root=True, capture_output=False)
     for name in [
         "gpumanager-sample.timer",
         "gpumanager-sample.service",
         "gpumanager-report.timer",
         "gpumanager-report.service",
     ]:
-        path = SYSTEMD_USER_DIR / name
+        path = SYSTEMD_SYSTEM_DIR / name
         if path.exists():
-            path.unlink()
+            _run_root_command("rm", "-f", str(path))
             removed.append(path)
-    _run_systemctl_user("daemon-reload")
+    _run_systemctl("daemon-reload", require_root=True, capture_output=False)
     return removed
 
 
-def _run_systemctl_user(*args: str) -> None:
+def _run_systemctl(*args: str, require_root: bool = False, capture_output: bool = True) -> subprocess.CompletedProcess:
     systemctl = shutil.which("systemctl")
     if not systemctl:
-        return
+        raise RuntimeError("systemctl not found")
+    command = [systemctl, *args]
+    if require_root:
+        command = _with_sudo(command)
     try:
-        subprocess.run([systemctl, "--user", *args], check=False, capture_output=True, text=True)
-    except OSError:
-        return
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=capture_output,
+            text=True,
+        )
+    except OSError as exc:
+        raise RuntimeError("Failed to run systemctl: {0}".format(exc)) from exc
+    if result.returncode != 0:
+        output = "\n".join(part.strip() for part in [result.stdout, result.stderr] if part and part.strip())
+        if output:
+            raise RuntimeError(output)
+        raise RuntimeError("systemctl command failed: {0}".format(" ".join(args)))
+    return result
 
 
-def _sample_service(command: List[str]) -> str:
+def _run_root_command(*args: str) -> None:
+    command = _with_sudo(list(args))
+    try:
+        result = subprocess.run(command, check=False, text=True)
+    except OSError as exc:
+        raise RuntimeError("Failed to run command: {0}".format(exc)) from exc
+    if result.returncode != 0:
+        raise RuntimeError("Command failed: {0}".format(" ".join(args)))
+
+
+def _with_sudo(command: List[str]) -> List[str]:
+    sudo = shutil.which("sudo")
+    if not sudo:
+        raise RuntimeError("sudo not found")
+    return [sudo, *command]
+
+
+def _sample_service(command: List[str], run_user: str) -> str:
     exec_start = " ".join(shlex.quote(part) for part in [part for part in command] + ["test-sample"])
     return "\n".join(
         [
@@ -122,6 +192,7 @@ def _sample_service(command: List[str]) -> str:
             "",
             "[Service]",
             "Type=oneshot",
+            "User={0}".format(run_user),
             "ExecStart={0}".format(exec_start),
             "",
         ]
@@ -145,10 +216,10 @@ def _sample_timer(sample_interval: str) -> str:
             "WantedBy=timers.target",
             "",
         ]
-    )
+    ) + "\n"
 
 
-def _report_service(command: List[str]) -> str:
+def _report_service(command: List[str], run_user: str) -> str:
     exec_start = " ".join(shlex.quote(part) for part in [part for part in command] + ["test-report"])
     return "\n".join(
         [
@@ -157,6 +228,7 @@ def _report_service(command: List[str]) -> str:
             "",
             "[Service]",
             "Type=oneshot",
+            "User={0}".format(run_user),
             "ExecStart={0}".format(exec_start),
             "",
         ]
@@ -178,7 +250,7 @@ def _report_timer(report_time: str, timezone: str) -> str:
             "WantedBy=timers.target",
             "",
         ]
-    )
+    ) + "\n"
 
 
 def interval_to_seconds(interval: str) -> int:
@@ -226,6 +298,7 @@ def cron_to_on_calendar(report_time: str, timezone: Optional[str] = None) -> str
     if timezone:
         return "{0} {1}".format(calendar, timezone.strip())
     return calendar
+
 
 def _convert_numeric_field(field: str, minimum: int, maximum: int) -> str:
     if field == "*":

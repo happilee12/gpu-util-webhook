@@ -14,7 +14,7 @@ Pip Page: https://pypi.org/project/gpumanager/
 - Aggregates average utilization by GPU UUID
 - Sends reports to Slack via webhook
 - Supports interactive configuration
-- Installs user-level `systemd` services and timers
+- Installs system-wide `systemd` services and timers
 - Uses minimal dependencies and stays close to the standard library
 
 ## Requirements
@@ -63,8 +63,9 @@ source ~/.bashrc
 ## Quick Start
 
 ```bash
-gpumanager install-systemd
 gpumanager init
+gpumanager install-systemd
+sudo systemctl enable --now gpumanager-sample.timer gpumanager-report.timer
 ```
 
 During `init`, the CLI shows the current server time and a few common cron examples so it is easier to enter `report.report_time`.
@@ -193,7 +194,7 @@ A few things must be prepared by the user before `gpumanager` can collect data a
 - `nvidia-smi` must work on the server
 - A valid Slack incoming webhook URL must be configured
 - The CSV storage directory must be writable
-- If you want automatic collection and reporting, the user-level `systemd` timers must be enabled
+- If you want automatic collection and reporting, the system-wide `systemd` timers must be enabled
 
 Slack incoming webhook setup reference:
 
@@ -210,12 +211,18 @@ gpumanager test-report
 
 ## Automatic Scheduling
 
-`gpumanager` does not start background collection on its own. To run sampling every minute and reporting on the configured cron-style schedule, install and enable the user timers.
+`gpumanager` does not start background collection on its own. To run sampling every minute and reporting on the configured cron-style schedule, install and enable the system timers.
 
-Install and enable timer files:
+Install the unit files:
 
 ```bash
 gpumanager install-systemd
+```
+
+Then enable the timers:
+
+```bash
+sudo systemctl enable --now gpumanager-sample.timer gpumanager-report.timer
 ```
 
 Check timer status or reload installed timers:
@@ -277,7 +284,7 @@ GPU 7: 63.93%
 
 ## systemd
 
-`gpumanager install-systemd` installs user services into `~/.config/systemd/user/`:
+`gpumanager install-systemd` installs system services into `/etc/systemd/system/`:
 
 - `gpumanager-sample.service`
 - `gpumanager-sample.timer`

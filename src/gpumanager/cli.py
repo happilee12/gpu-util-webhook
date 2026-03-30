@@ -16,14 +16,16 @@ from gpumanager.report import make_report, render_report_message
 from gpumanager.slack import send_slack_message
 from gpumanager.storage import csv_files_in_range, delete_files, write_sample_csv
 from gpumanager.systemd import (
-    SYSTEMD_USER_DIR,
+    SYSTEMD_SYSTEM_DIR,
     cron_to_on_calendar,
     disable_report_timer,
     disable_sample_timer,
-    install_user_units,
-    reload_user_units,
-    sync_installed_user_units,
-    uninstall_user_units,
+    enable_system_timers,
+    find_conflicting_user_units,
+    install_system_units,
+    reload_system_units,
+    sync_installed_system_units,
+    uninstall_system_units,
 )
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,11 +45,13 @@ def build_parser() -> argparse.ArgumentParser:
     delete_parser.add_argument("--yes", action="store_true", help="Skip confirmation prompt")
 
     subparsers.add_parser("status", help="Show runtime and configuration status")
-    subparsers.add_parser("install-systemd", help="Install user-level systemd services and timers")
-    subparsers.add_parser("uninstall-systemd", help="Remove user-level systemd services and timers")
+    install_parser = subparsers.add_parser("install-systemd", help="Install system-wide systemd services and timers")
+    install_parser.add_argument("--enable-now", action="store_true", help="Enable and start the system timers after installing them")
+    install_parser.add_argument("--run-user", help="Linux user account that the system services should run as")
+    subparsers.add_parser("uninstall-systemd", help="Remove system-wide systemd services and timers")
     subparsers.add_parser("disable-sample", help="Disable the sample timer")
     subparsers.add_parser("disable-report", help="Disable the report timer")
-    subparsers.add_parser("reload", help="Reload user systemd timers for gpumanager")
+    subparsers.add_parser("reload", help="Reload system-wide systemd timers for gpumanager")
     return parser
 
 
@@ -67,7 +71,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "status":
             return command_status(args.config)
         if args.command == "install-systemd":
-            return command_install_systemd(args.config)
+            return command_install_systemd(args.config, enable_now=args.enable_now, run_user=args.run_user)
         if args.command == "uninstall-systemd":
             return command_uninstall_systemd()
         if args.command == "disable-sample":
@@ -103,7 +107,7 @@ def command_init(config_path: Optional[str]) -> int:
     config.timezone = _prompt("Timezone", config.timezone)
     _validate_config(config)
     saved = save_config(config, config_path)
-    synced = sync_installed_user_units(config)
+    synced = sync_installed_system_units(config)
     print("Saved configuration to {0}".format(saved))
     if synced:
         print("Reloaded installed timers: {0}".format(", ".join(synced)))
@@ -156,8 +160,8 @@ def command_delete_csv(config_path: Optional[str], start: Optional[str] = None, 
 
 def command_status(config_path: Optional[str]) -> int:
     config = load_config(config_path, allow_missing=True)
-    sample_timer = SYSTEMD_USER_DIR / "gpumanager-sample.timer"
-    report_timer = SYSTEMD_USER_DIR / "gpumanager-report.timer"
+    sample_timer = SYSTEMD_SYSTEM_DIR / "gpumanager-sample.timer"
+    report_timer = SYSTEMD_SYSTEM_DIR / "gpumanager-report.timer"
     sample_next_trigger = _read_timer_trigger("gpumanager-sample.timer")
     report_next_trigger = _read_timer_trigger("gpumanager-report.timer")
     status = {
@@ -174,6 +178,7 @@ def command_status(config_path: Optional[str]) -> int:
         "general.server_name": config.server_name,
         "nvidia_smi": nvidia_smi_path(),
         "systemctl": shutil.which("systemctl"),
+        "systemd_scope": "system",
         "sample_timer_installed": sample_timer.exists(),
         "report_timer_installed": report_timer.exists(),
         "sample.next_trigger": sample_next_trigger,
@@ -189,7 +194,7 @@ def _read_timer_trigger(unit_name: str) -> Optional[str]:
         return None
     try:
         result = subprocess.run(
-            [systemctl, "--user", "status", unit_name],
+            [systemctl, "status", unit_name],
             check=False,
             capture_output=True,
             text=True,
@@ -207,14 +212,30 @@ def _read_timer_trigger(unit_name: str) -> Optional[str]:
     return None
 
 
-def command_install_systemd(config_path: Optional[str]) -> int:
+def command_install_systemd(config_path: Optional[str], enable_now: bool = False, run_user: Optional[str] = None) -> int:
     config = load_config(config_path)
     _validate_config(config)
-    written = install_user_units(config)
+    written = install_system_units(config, run_user=run_user)
     print("Installed unit files:")
     for path in written:
         print(path)
-    print("Enable with: systemctl --user enable --now gpumanager-sample.timer gpumanager-report.timer")
+    conflicts = find_conflicting_user_units()
+    if conflicts:
+        print("Warning: conflicting user-level systemd units were found:")
+        for path in conflicts:
+            print(path)
+        print("Disable and remove them to avoid timers stopping when the login session ends.")
+        print("Suggested cleanup: systemctl --user disable --now gpumanager-sample.timer gpumanager-report.timer")
+    if enable_now:
+        enable_system_timers()
+        print("Enabled and started system timers: gpumanager-sample.timer, gpumanager-report.timer")
+    else:
+        print("Enable with: sudo systemctl enable --now gpumanager-sample.timer gpumanager-report.timer")
+    if run_user:
+        print("System services will run as user: {0}".format(run_user))
+    if config.path is None and config_path is None:
+        print("Note: the default config path depends on the service user's home directory.")
+        print("Consider using --config with an absolute path for predictable system-wide behavior.")
     return 0
 
 
@@ -231,7 +252,7 @@ def command_disable_report() -> int:
 
 
 def command_reload() -> int:
-    reloaded = reload_user_units()
+    reloaded = reload_system_units()
     if not reloaded:
         print("No installed timers found.")
         return 0
@@ -240,7 +261,7 @@ def command_reload() -> int:
 
 
 def command_uninstall_systemd() -> int:
-    removed = uninstall_user_units()
+    removed = uninstall_system_units()
     if not removed:
         print("No unit files found.")
         return 0
